@@ -34,6 +34,11 @@ var (
 	pRegisterHotKey             = user32.NewProc("RegisterHotKey")
 	pGetMessageW                = user32.NewProc("GetMessageW")
 	pDwmSetWindowAttribute      = dwmapi.NewProc("DwmSetWindowAttribute")
+	pEnumChildWindows           = user32.NewProc("EnumChildWindows")
+	pGetClassNameW              = user32.NewProc("GetClassNameW")
+	pSetWindowRgn               = user32.NewProc("SetWindowRgn")
+	gdi32                       = syscall.NewLazyDLL("gdi32.dll")
+	pCreateRoundRectRgn         = gdi32.NewProc("CreateRoundRectRgn")
 )
 
 const (
@@ -165,15 +170,56 @@ func window() uintptr {
 	return curWin
 }
 
-// frameless strips the title bar and borders; the page draws its own header.
-func frameless(h uintptr) {
-	style, _, _ := pGetWindowLongPtrW.Call(h, gwlStyle)
-	want := (style &^ (wsCaption | wsThickFrame | wsSysMenu | wsMinimizeBox | wsMaximizeBox)) | wsPopup
-	if want != style {
-		pSetWindowLongPtrW.Call(h, gwlStyle, want)
-		pSetWindowPos.Call(h, 0, 0, 0, 0, 0, swpNoMove|swpNoSize|swpNoZOrder|swpNoActivate|swpFrameChanged)
-		pref := uint32(dwmRound)
-		pDwmSetWindowAttribute.Call(h, dwmCornerPref, uintptr(unsafe.Pointer(&pref)), 4)
+// Edge draws its own title bar inside the window, so styles can't remove it.
+// Instead the window is clipped (SetWindowRgn) to the web page area: the
+// Chrome_RenderWidgetHostHWND child is exactly the page, so its rect is the cut.
+var (
+	childMu    sync.Mutex
+	childFound uintptr
+	childCB    = syscall.NewCallback(func(h, _ uintptr) uintptr {
+		buf := make([]uint16, 128)
+		n, _, _ := pGetClassNameW.Call(h, uintptr(unsafe.Pointer(&buf[0])), 128)
+		if n > 0 && syscall.UTF16ToString(buf[:n]) == "Chrome_RenderWidgetHostHWND" {
+			if v, _, _ := pIsWindowVisible.Call(h); v != 0 {
+				childFound = h
+				return 0
+			}
+		}
+		return 1
+	})
+	lastClip rect
+)
+
+func pageRect(top uintptr) (rect, bool) {
+	childMu.Lock()
+	defer childMu.Unlock()
+	childFound = 0
+	pEnumChildWindows.Call(top, childCB, 0)
+	if childFound == 0 {
+		return rect{}, false
+	}
+	var r rect
+	pGetWindowRect.Call(childFound, uintptr(unsafe.Pointer(&r)))
+	return r, r.R > r.L && r.B > r.T
+}
+
+// clipToPage hides Edge's title bar and borders by clipping the window to the page.
+func clipToPage(h uintptr) {
+	page, ok := pageRect(h)
+	if !ok {
+		return
+	}
+	var win rect
+	pGetWindowRect.Call(h, uintptr(unsafe.Pointer(&win)))
+	c := rect{page.L - win.L, page.T - win.T, page.R - win.L, page.B - win.T}
+	if c == lastClip {
+		return
+	}
+	lastClip = c
+	rgn, _, _ := pCreateRoundRectRgn.Call(uintptr(c.L), uintptr(c.T), uintptr(c.R+1), uintptr(c.B+1), 16, 16)
+	if rgn != 0 {
+		pSetWindowRgn.Call(h, rgn, 1) // the system owns rgn now
+		logf("clipped window to page (%dx%d, title bar %dpx)", c.R-c.L, c.B-c.T, c.T)
 	}
 }
 
@@ -213,12 +259,11 @@ func keepOnTop(cmd *exec.Cmd) {
 			if h != last {
 				logf("overlay window ready")
 				last = h
-				frameless(h)
 				// put it exactly where it was last time (saved in screen pixels)
 				set := st0.GetSettings()
 				pSetWindowPos.Call(h, 0, uintptr(set.X), uintptr(set.Y), uintptr(set.W), uintptr(set.H), swpNoZOrder|swpNoActivate)
 			}
-			frameless(h)
+			clipToPage(h)
 			applyExStyle(h, st0.GetSettings())
 			pSetWindowPos.Call(h, hwndTopmost, 0, 0, 0, 0, swpNoMove|swpNoSize|swpNoActivate)
 		} else if seen {
@@ -260,6 +305,7 @@ func windowDrag(st *State, resize bool) {
 		pGetCursorPos.Call(uintptr(unsafe.Pointer(&p)))
 		dx, dy := p.X-start.X, p.Y-start.Y
 		if resize {
+			clipToPage(h)
 			nw, nh := w0+dx, h0+dy
 			if nw < 260 {
 				nw = 260
@@ -274,6 +320,8 @@ func windowDrag(st *State, resize bool) {
 		time.Sleep(8 * time.Millisecond)
 	}
 	pGetWindowRect.Call(h, uintptr(unsafe.Pointer(&r)))
+	time.Sleep(50 * time.Millisecond)
+	clipToPage(h)
 	st.UpdateSettings(func(s *Settings) {
 		s.X, s.Y, s.W, s.H = int(r.L), int(r.T), int(r.R-r.L), int(r.B-r.T)
 	})
@@ -287,9 +335,16 @@ func windowResize(height int) {
 	}
 	var r rect
 	pGetWindowRect.Call(h, uintptr(unsafe.Pointer(&r)))
+	// height is the page height; add Edge's hidden title bar + border on top of it
+	if page, ok := pageRect(h); ok {
+		height += int((r.B - r.T) - (page.B - page.T))
+	}
 	pSetWindowPos.Call(h, 0, 0, 0, uintptr(r.R-r.L), uintptr(height), swpNoMove|swpNoZOrder|swpNoActivate)
+	time.Sleep(80 * time.Millisecond)
+	clipToPage(h)
 	if st0 != nil {
-		st0.UpdateSettings(func(s *Settings) { s.H = height })
+		pGetWindowRect.Call(h, uintptr(unsafe.Pointer(&r)))
+		st0.UpdateSettings(func(s *Settings) { s.H = int(r.B - r.T) })
 	}
 }
 
