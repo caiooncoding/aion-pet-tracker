@@ -116,6 +116,9 @@ func findEdge() string {
 // openOverlay opens the page as a small app window and keeps it on top of the game.
 func openOverlay(url string, st *State) {
 	st0 = st
+	if openNative(url, st) {
+		return
+	}
 	browser := findEdge()
 	if browser == "" {
 		logf("Edge/Chrome not found, opening default browser")
@@ -201,6 +204,13 @@ var (
 // window edges, which beat guessing from Edge's child windows. Until the page has
 // reported, the Chrome_RenderWidgetHostHWND child is used.
 func pageRect(top uintptr) (rect, bool) {
+	if ownWindow { // our own window: the page is the whole client area
+		var cl rect
+		var o point
+		pGetClientRect.Call(top, uintptr(unsafe.Pointer(&cl)))
+		pClientToScreen.Call(top, uintptr(unsafe.Pointer(&o)))
+		return rect{o.X, o.Y, o.X + cl.R, o.Y + cl.B}, cl.R > 0 && cl.B > 0
+	}
 	var win rect
 	pGetWindowRect.Call(top, uintptr(unsafe.Pointer(&win)))
 	geoMu.Lock()
@@ -243,7 +253,7 @@ var (
 
 func setPageGeom(g pageGeom) {
 	h := window()
-	if h == 0 || g.DPR <= 0 || g.IW <= 0 || g.IH <= 0 {
+	if ownWindow || h == 0 || g.DPR <= 0 || g.IW <= 0 || g.IH <= 0 {
 		return
 	}
 	var win rect
@@ -322,6 +332,9 @@ var (
 var clipMu sync.Mutex
 
 func clipToPage(h uintptr) {
+	if ownWindow {
+		return
+	}
 	clipMu.Lock()
 	defer clipMu.Unlock()
 	page, ok := pageRect(h)
