@@ -75,6 +75,14 @@ func serveWeb(port int, st *State) error {
 	})
 	registerWindowAPI(mux, st)
 	registerMapAPI(mux)
+	mux.HandleFunc("/api/update", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "POST only", 405)
+			return
+		}
+		go installUpdate(st)
+		w.WriteHeader(204)
+	})
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		return err

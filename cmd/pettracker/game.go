@@ -129,6 +129,13 @@ func (s *State) Subscribe() chan struct{} {
 	return ch
 }
 
+// Touch pushes a fresh view to the overlay.
+func (s *State) Touch() {
+	s.mu.Lock()
+	s.notify()
+	s.mu.Unlock()
+}
+
 func (s *State) notify() {
 	for _, ch := range s.listeners {
 		select {
@@ -496,23 +503,24 @@ type PetView struct {
 }
 
 type View struct {
-	Version  string    `json:"version"`
-	Settings Settings  `json:"settings"`
-	Focus    *PetView  `json:"focus,omitempty"` // the pet you're farming right now
-	Map      *MapView  `json:"map,omitempty"`
-	Session  int       `json:"session"` // souls gained this session
-	Live     bool      `json:"live"`
-	Frames   int       `json:"frames"`
-	HaveList bool      `json:"haveList"`
-	Recent   []PetView `json:"recent"`
-	Nearby   []PetView `json:"nearby"`
-	All      []PetView `json:"all"`
+	Version  string      `json:"version"`
+	Update   *UpdateInfo `json:"update,omitempty"`
+	Settings Settings    `json:"settings"`
+	Focus    *PetView    `json:"focus,omitempty"` // the pet you're farming right now
+	Map      *MapView    `json:"map,omitempty"`
+	Session  int         `json:"session"` // souls gained this session
+	Live     bool        `json:"live"`
+	Frames   int         `json:"frames"`
+	HaveList bool        `json:"haveList"`
+	Recent   []PetView   `json:"recent"`
+	Nearby   []PetView   `json:"nearby"`
+	All      []PetView   `json:"all"`
 }
 
 func (s *State) View(now time.Time) View {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	v := View{Version: version, Settings: s.Settings, Live: now.Sub(s.lastFrame) < 15*time.Second, Frames: s.frames, HaveList: !s.ListSeen.IsZero()}
+	v := View{Version: version, Update: currentUpdate(), Settings: s.Settings, Live: now.Sub(s.lastFrame) < 15*time.Second, Frames: s.frames, HaveList: !s.ListSeen.IsZero()}
 
 	mk := func(p *Pet) PetView {
 		pv := PetView{ID: p.ID, Level: p.Level, Souls: p.Souls, Need: soulsToNext(p.Level), Session: p.SessionAdd, Ago: -1}

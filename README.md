@@ -12,6 +12,8 @@ There are plenty of DPS meters for AION 2. As far as I know, none of them track 
 2. Download `PetTracker-Setup-x.y.z.exe` from [Releases](https://github.com/caiooncoding/aion-pet-tracker/releases/latest) and run it. It installs for your user only and doesn't need admin rights.
 3. Start **Pet Tracker** *before* you log into your character. The game only sends your pet list during login.
 
+**Updating:** when a new version is out, an **Update x.y.z** button shows up in the overlay's header. Click it and the app downloads the installer, updates itself and starts again. You can also just run a newer `PetTracker-Setup` over the old one. Either way there's no need to uninstall, and your pets, settings and window position are kept.
+
 Windows SmartScreen may warn about an unknown publisher, because the installer isn't code-signed. Click **More info → Run anyway**.
 
 **Requirements:** Windows 10/11 (64-bit), Npcap, and Microsoft Edge or Google Chrome for the overlay window. Edge ships with Windows. Run the game in **windowed** or **borderless** mode so the overlay can sit on top of it.
@@ -51,7 +53,7 @@ The useful messages from the game server:
 
 Pet ids are matched to names with a built-in table. Monster names are matched to pets through the wiki data, which is how the Nearby tab works. The pet list comes from wikily.gg and is refreshed once a week. A copy is built in, so the app also works offline.
 
-Everything stays on your PC. The overlay is a local page on `127.0.0.1:7319`. The only outside request is the weekly pet list download from wikily.gg, plus the pet icons.
+Everything stays on your PC. The overlay is a local page on `127.0.0.1:7319`. The only outside requests are the weekly pet list download from wikily.gg, the pet icons, and an update check against this repo's GitHub releases every few hours (set `PT_NO_UPDATE=1` to turn it off).
 
 Your progress and logs are kept in `%APPDATA%\PetTracker`. If something breaks, `pettracker.log` in that folder is the first thing to look at.
 
@@ -89,6 +91,8 @@ cmd/pettracker/   the app (Go, standard library only)
   capture_windows.go Npcap (wpcap.dll) binding, no cgo
   game.go           pet / monster state
   data.go           pet + monster data
+  zonemap.go        Map tab: zone detection, map calibration, tiles
+  update.go         update check + one-click update
   web.go, assets/overlay.html   the overlay page
   overlay_windows.go  overlay window, kept on top
 installer/        NSIS script, icon, manifest

@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-var version = "0.4.0" // overridden at build time with -ldflags "-X main.version=..."
+var version = "0.4.1" // overridden at build time with -ldflags "-X main.version=..."
 
 func dataDir() string {
 	if d := os.Getenv("APPDATA"); d != "" {
@@ -111,6 +111,8 @@ func main() {
 			os.Exit(1)
 		}
 	}()
+
+	go updateLoop(st)
 
 	if !*noWindow {
 		time.Sleep(300 * time.Millisecond)

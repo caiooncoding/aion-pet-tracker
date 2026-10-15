@@ -34,6 +34,11 @@
   .ib:hover { background: var(--bg-3); color: var(--text); }
   .ib.on { color: var(--accent); }
   body.locked #lockBtn { background: var(--bg-3); color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .upd { display: none; height: 20px; padding: 0 8px; border: 0; border-radius: 10px; background: var(--accent); color: #0b0e11;
+    font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; flex: none; }
+  .upd.show { display: block; }
+  .upd:disabled { opacity: .7; cursor: default; }
+  body.locked .upd { visibility: hidden; }
   .ib svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
   /* focus block */
@@ -136,6 +141,7 @@
 <div class="app">
   <div class="top" id="drag">
     <div class="brand">PET TRACKER<small id="ver"></small></div>
+    <button class="upd" id="updBtn"></button>
     <button class="ib" id="searchBtn" title="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg></button>
     <button class="ib" id="setBtn" title="Settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
     <button class="ib" id="lockBtn" title="Lock: clicks go through to the game (Ctrl+Shift+P)"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path id="shackle" d="M8 11V8a4 4 0 0 1 8 0"/></svg></button>
@@ -194,6 +200,7 @@
   ['drag', 'focus'].forEach(id => $(id).addEventListener('mousedown', e => { if (!e.target.closest('button')) startDrag(e, 'move'); }));
   $('grip').addEventListener('mousedown', e => startDrag(e, 'resize'));
   $('closeBtn').onclick = () => post('/api/window?do=close');
+  $('updBtn').onclick = () => { $('updBtn').disabled = true; $('updBtn').textContent = 'Downloading…'; post('/api/update'); };
   $('minBtn').onclick = () => post('/api/window?do=minimize');
   $('lockBtn').onclick = () => save({ locked: !set.locked });
   $('setBtn').onclick = () => { $('panel').classList.toggle('show'); $('setBtn').classList.toggle('on'); };
@@ -343,6 +350,15 @@
     if (!view) return;
 
     $('ver').textContent = 'v' + view.version;
+    const u = view.update, ub = $('updBtn');
+    ub.classList.toggle('show', !!u);
+    if (u) {
+      const busy = u.state === 'downloading' || u.state === 'installing';
+      ub.disabled = busy;
+      ub.textContent = u.state === 'downloading' ? 'Downloading…' : u.state === 'installing' ? 'Updating…'
+        : u.state === 'failed' ? 'Retry update' : 'Update ' + u.version;
+      ub.title = u.state === 'failed' ? 'The download failed. Click to try again, or get it from GitHub.' : 'Install ' + u.version + ' and restart (pets and settings are kept)';
+    }
     $('dot').classList.toggle('live', !!view.live);
     $('status').textContent = set.locked ? 'Locked · Ctrl+Shift+P' : view.live ? 'Live' : 'Waiting for game';
     $('stSouls').innerHTML = `<b>+${view.session || 0}</b> souls`;

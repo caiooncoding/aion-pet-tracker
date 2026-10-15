@@ -39,6 +39,7 @@ var (
 	pSetWindowRgn               = user32.NewProc("SetWindowRgn")
 	gdi32                       = syscall.NewLazyDLL("gdi32.dll")
 	pCreateRoundRectRgn         = gdi32.NewProc("CreateRoundRectRgn")
+	pGetWindowRgnBox            = user32.NewProc("GetWindowRgnBox")
 )
 
 const (
@@ -205,7 +206,13 @@ func pageRect(top uintptr) (rect, bool) {
 }
 
 // clipToPage hides Edge's title bar and borders by clipping the window to the page.
+// Edge resets the window region on its own (resize, focus, theme changes), so this
+// checks the live region every call and puts the clip back whenever it's gone.
+var clipMu sync.Mutex
+
 func clipToPage(h uintptr) {
+	clipMu.Lock()
+	defer clipMu.Unlock()
 	page, ok := pageRect(h)
 	if !ok {
 		return
@@ -213,15 +220,39 @@ func clipToPage(h uintptr) {
 	var win rect
 	pGetWindowRect.Call(h, uintptr(unsafe.Pointer(&win)))
 	c := rect{page.L - win.L, page.T - win.T, page.R - win.L, page.B - win.T}
-	if c == lastClip {
+	if c.R-c.L < 50 || c.B-c.T < 50 {
 		return
 	}
+	var box rect
+	kind, _, _ := pGetWindowRgnBox.Call(h, uintptr(unsafe.Pointer(&box)))
+	// kind 0 = no region (Edge cleared it). Otherwise the box must match the page.
+	if kind != 0 && c == lastClip && abs32(box.T-c.T) <= 1 && abs32(box.L-c.L) <= 1 &&
+		abs32(box.B-c.B) <= 2 && abs32(box.R-c.R) <= 2 {
+		return
+	}
+	reset := kind == 0 && c == lastClip
 	lastClip = c
 	rgn, _, _ := pCreateRoundRectRgn.Call(uintptr(c.L), uintptr(c.T), uintptr(c.R+1), uintptr(c.B+1), 16, 16)
 	if rgn != 0 {
 		pSetWindowRgn.Call(h, rgn, 1) // the system owns rgn now
-		logf("clipped window to page (%dx%d, title bar %dpx)", c.R-c.L, c.B-c.T, c.T)
+		if reset {
+			clipResets++
+			if clipResets <= 3 || clipResets%100 == 0 {
+				logf("edge dropped the window clip, put it back (%d times)", clipResets)
+			}
+		} else {
+			logf("clipped window to page (%dx%d, title bar %dpx)", c.R-c.L, c.B-c.T, c.T)
+		}
 	}
+}
+
+var clipResets int
+
+func abs32(v int32) int32 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 // Lock hotspot: the lock button stays clickable while the rest is click-through.
@@ -242,11 +273,14 @@ func setLockHotspot(x, y, w, h, dpr float64) {
 }
 
 func lockWatcher() {
-	for {
+	for tick := 0; ; tick++ {
 		time.Sleep(40 * time.Millisecond)
 		h := window()
 		if h == 0 || st0 == nil {
 			continue
+		}
+		if tick%5 == 0 {
+			clipToPage(h) // cheap; catches Edge clearing the clip within ~200 ms
 		}
 		set := st0.GetSettings()
 		inside := false

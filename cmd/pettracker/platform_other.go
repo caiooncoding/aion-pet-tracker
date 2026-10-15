@@ -15,3 +15,4 @@ func windowMinimize()                        {}
 func windowClose()                           {}
 func windowResize(h int)                     {}
 func setLockHotspot(x, y, w, h, dpr float64) {}
+func runInstaller(path string) error         { return errors.New("only on Windows") }

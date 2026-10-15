@@ -42,6 +42,18 @@ VIAddVersionKey "LegalCopyright" "MIT License"
 !include "LogicLib.nsh"
 !include "FileFunc.nsh"
 
+; Update mode: when Pet Tracker is already installed, the installer skips the
+; license and folder pages, installs over the old version in the same folder and
+; keeps everything in %APPDATA%\PetTracker (pets, settings, window position).
+; No uninstall needed between versions.
+Var IsUpdate
+Var OldVersion
+Var WasRunning
+Var WelcomeTitle
+Var WelcomeText
+Var FinishTitle
+Var FinishText
+
 !define MUI_ICON "icon.ico"
 !define MUI_UNICON "icon.ico"
 !define MUI_ABORTWARNING
@@ -51,17 +63,113 @@ VIAddVersionKey "LegalCopyright" "MIT License"
 !define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
 !define MUI_FINISHPAGE_SHOWREADME_TEXT "Create a desktop shortcut"
 !define MUI_FINISHPAGE_SHOWREADME_FUNCTION DesktopShortcut
+!define MUI_FINISHPAGE_TITLE "$FinishTitle"
+!define MUI_FINISHPAGE_TEXT "$FinishText"
+!define MUI_WELCOMEPAGE_TITLE "$WelcomeTitle"
+!define MUI_WELCOMEPAGE_TEXT "$WelcomeText"
 
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW WelcomeShow
 !insertmacro MUI_PAGE_WELCOME
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipOnUpdate
 !insertmacro MUI_PAGE_LICENSE "..\LICENSE"
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipOnUpdate
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
+!define MUI_PAGE_CUSTOMFUNCTION_SHOW FinishShow
 !insertmacro MUI_PAGE_FINISH
 
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
 
 !insertmacro MUI_LANGUAGE "English"
+
+Function .onInit
+  StrCpy $IsUpdate 0
+  StrCpy $WasRunning 0
+  ReadRegStr $0 HKCU "Software\AionPetTracker" "InstallDir"
+  ${If} $0 != ""
+  ${AndIf} ${FileExists} "$0\${APPEXE}"
+    StrCpy $IsUpdate 1
+    StrCpy $INSTDIR $0
+    ReadRegStr $OldVersion HKCU "${UNINSTKEY}" "DisplayVersion"
+  ${EndIf}
+
+  ${If} $IsUpdate == 1
+    ${If} $OldVersion == "${VERSION}"
+      StrCpy $WelcomeTitle "Reinstall ${APPNAME} ${VERSION}"
+      StrCpy $WelcomeText "${APPNAME} ${VERSION} is already installed. This puts a fresh copy over it.$\r$\n$\r$\nYour pets, settings and window position are kept.$\r$\n$\r$\nIf ${APPNAME} is running it will be closed and started again."
+    ${Else}
+      ${If} $OldVersion == ""
+        StrCpy $OldVersion "your current version"
+      ${EndIf}
+      StrCpy $WelcomeTitle "Update ${APPNAME} to ${VERSION}"
+      StrCpy $WelcomeText "This updates ${APPNAME} from $OldVersion to ${VERSION}. No need to uninstall first.$\r$\n$\r$\nYour pets, settings and window position are kept.$\r$\n$\r$\nIf ${APPNAME} is running it will be closed and started again."
+    ${EndIf}
+    StrCpy $FinishTitle "${APPNAME} is up to date"
+    StrCpy $FinishText "${APPNAME} ${VERSION} is installed."
+  ${Else}
+    StrCpy $WelcomeTitle "Welcome to ${APPNAME} ${VERSION}"
+    StrCpy $WelcomeText "An overlay for AION 2 that tracks your pet souls while you farm.$\r$\n$\r$\n${APPNAME} needs Npcap to read the game's network traffic. If it's missing, the installer will point you to the download.$\r$\n$\r$\nClick Next to continue."
+    StrCpy $FinishTitle "${APPNAME} is installed"
+    StrCpy $FinishText "Start it before you log into your character, so it catches your pet list."
+  ${EndIf}
+FunctionEnd
+
+Function SkipOnUpdate
+  ${If} $IsUpdate == 1
+    Abort
+  ${EndIf}
+FunctionEnd
+
+Function WelcomeShow
+  ${If} $IsUpdate == 1
+    GetDlgItem $0 $HWNDPARENT 1
+    ${If} $OldVersion == "${VERSION}"
+      SendMessage $0 ${WM_SETTEXT} 0 "STR:Reinstall"
+    ${Else}
+      SendMessage $0 ${WM_SETTEXT} 0 "STR:Update"
+    ${EndIf}
+  ${EndIf}
+FunctionEnd
+
+Function FinishShow
+  ; the desktop shortcut was offered on the first install; don't ask again
+  ${If} $IsUpdate == 1
+    ShowWindow $mui.FinishPage.ShowReadme ${SW_HIDE}
+  ${EndIf}
+FunctionEnd
+
+; Close a running copy so its files can be replaced. Asks it to close first (it
+; saves its state), then makes sure: the app and its overlay window (an Edge/Chrome
+; process using Pet Tracker's own profile folder) are both stopped.
+!macro CLOSE_RUNNING
+  nsExec::ExecToStack `powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$$r=0; if (Get-Process PetTracker -ErrorAction SilentlyContinue) { $$r=1; try { Invoke-WebRequest -UseBasicParsing -Method Post -TimeoutSec 3 'http://127.0.0.1:7319/api/window?do=close' | Out-Null } catch {}; for ($$i=0; $$i -lt 20 -and (Get-Process PetTracker -ErrorAction SilentlyContinue); $$i++) { Start-Sleep -Milliseconds 250 } }; Get-Process PetTracker -ErrorAction SilentlyContinue | Stop-Process -Force; Get-CimInstance Win32_Process -Filter \"Name='msedge.exe' or Name='chrome.exe'\" | Where-Object { $$_.CommandLine -like '*PetTracker\window*' } | ForEach-Object { Stop-Process -Id $$_.ProcessId -Force -ErrorAction SilentlyContinue }; Write-Output $$r"`
+  Pop $0 ; exit code
+  Pop $1 ; output
+  StrCpy $1 $1 1
+  ${If} $1 == "1"
+    StrCpy $WasRunning 1
+  ${EndIf}
+  ; fallback in case PowerShell isn't available
+  nsExec::Exec 'taskkill /F /IM ${APPEXE}'
+  Sleep 500
+!macroend
+
+Function CloseRunning
+  !insertmacro CLOSE_RUNNING
+FunctionEnd
+
+Function un.CloseRunning
+  !insertmacro CLOSE_RUNNING
+FunctionEnd
+
+Function .onInstSuccess
+  ; silent update (from the app's Update button): start it again
+  ${If} ${Silent}
+  ${AndIf} $WasRunning == 1
+    Exec '"$INSTDIR\${APPEXE}"'
+  ${EndIf}
+FunctionEnd
 
 Function DesktopShortcut
   CreateShortcut "$DESKTOP\${APPNAME}.lnk" "$INSTDIR\${APPEXE}" "" "$INSTDIR\${APPEXE}" 0
@@ -85,9 +193,10 @@ Function CheckNpcap
 FunctionEnd
 
 Section "Install"
-  ; close a running copy so the exe can be replaced
-  nsExec::Exec 'taskkill /F /IM ${APPEXE}'
-  Sleep 500
+  ${If} $IsUpdate == 1
+    DetailPrint "Updating ${APPNAME} $OldVersion -> ${VERSION} in $INSTDIR"
+  ${EndIf}
+  Call CloseRunning
 
   SetOutPath "$INSTDIR"
   File "${SRCDIR}\${APPEXE}"
@@ -101,6 +210,11 @@ Section "Install"
   SetOutPath "$INSTDIR"
 
   WriteUninstaller "$INSTDIR\Uninstall.exe"
+
+  ; keep an existing desktop shortcut pointing at the new exe
+  ${If} ${FileExists} "$DESKTOP\${APPNAME}.lnk"
+    Call DesktopShortcut
+  ${EndIf}
 
   CreateDirectory "$SMPROGRAMS\${APPNAME}"
   CreateShortcut "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk" "$INSTDIR\${APPEXE}" "" "$INSTDIR\${APPEXE}" 0
@@ -121,12 +235,13 @@ Section "Install"
   IntFmt $0 "0x%08X" $0
   WriteRegDWORD HKCU "${UNINSTKEY}" "EstimatedSize" "$0"
 
-  Call CheckNpcap
+  ${IfNot} ${Silent}
+    Call CheckNpcap
+  ${EndIf}
 SectionEnd
 
 Section "Uninstall"
-  nsExec::Exec 'taskkill /F /IM ${APPEXE}'
-  Sleep 500
+  Call un.CloseRunning
   Delete "$INSTDIR\${APPEXE}"
   Delete "$INSTDIR\LICENSE.txt"
   Delete "$INSTDIR\README.md"
