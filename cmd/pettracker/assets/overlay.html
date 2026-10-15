@@ -32,6 +32,7 @@
     background: transparent; color: var(--muted); cursor: pointer; flex: none; }
   .ib:hover { background: var(--bg-3); color: var(--text); }
   .ib.on { color: var(--accent); }
+  body.locked #lockBtn { background: var(--bg-3); color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
   .ib svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
   /* focus block */
@@ -110,7 +111,7 @@
     <div class="brand">PET TRACKER<small id="ver"></small></div>
     <button class="ib" id="searchBtn" title="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg></button>
     <button class="ib" id="setBtn" title="Settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
-    <button class="ib" id="lockBtn" title="Lock (click-through) — Ctrl+Shift+P"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path id="shackle" d="M8 11V8a4 4 0 0 1 8 0"/></svg></button>
+    <button class="ib" id="lockBtn" title="Lock: clicks go through to the game (Ctrl+Shift+P)"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path id="shackle" d="M8 11V8a4 4 0 0 1 8 0"/></svg></button>
     <button class="ib" id="minBtn" title="Minimize"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button>
     <button class="ib" id="closeBtn" title="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
@@ -261,7 +262,20 @@
       list.innerHTML = items.map(p => row(p, set.tab)).join('');
     }
     (view.all || []).forEach(p => lastSig.set(p.id, p.souls + p.level * 1000));
+    reportLock();
   }
+
+  // tell the app where the lock button is, so it stays clickable while locked
+  let lastHot = '';
+  function reportLock() {
+    const r = $('lockBtn').getBoundingClientRect();
+    const k = [r.left, r.top, r.width, r.height, devicePixelRatio].map(v => Math.round(v * 100) / 100).join(',');
+    if (k === lastHot) return;
+    lastHot = k;
+    post(`/api/window?do=hotspot&x=${r.left}&y=${r.top}&w=${r.width}&h=${r.height}&dpr=${devicePixelRatio}`);
+  }
+  window.addEventListener('resize', () => { lastHot = ''; reportLock(); });
+  setInterval(reportLock, 2000);
 
   function connect() {
     const es = new EventSource('/api/events');

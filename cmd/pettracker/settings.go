@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 )
 
 // Settings are the overlay preferences, saved with the rest of the state.
@@ -108,6 +109,10 @@ func registerWindowAPI(mux *http.ServeMux, st *State) {
 				windowResize(cur.FullH)
 				st.UpdateSettings(func(s *Settings) { s.H, s.FullH = s.FullH, 0 })
 			}
+		case "hotspot": // where the lock button is, so it stays clickable when locked
+			q := r.URL.Query()
+			f := func(k string) float64 { v, _ := strconv.ParseFloat(q.Get(k), 64); return v }
+			setLockHotspot(f("x"), f("y"), f("w"), f("h"), f("dpr"))
 		case "minimize":
 			windowMinimize()
 		case "close":

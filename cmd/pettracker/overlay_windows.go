@@ -133,6 +133,7 @@ func openOverlay(url string, st *State) {
 		return
 	}
 	go hotkeyLoop()
+	go lockWatcher()
 	// Edge often hands the window to another process and exits right away,
 	// so the process can't tell us when the window closes. keepOnTop watches the window itself.
 	go func() { _ = cmd.Wait() }()
@@ -223,10 +224,65 @@ func clipToPage(h uintptr) {
 	}
 }
 
+// Lock hotspot: the lock button stays clickable while the rest is click-through.
+// The page reports the button's rect (CSS px, relative to the page) and the
+// device pixel ratio; a watcher turns click-through off while the cursor is on it.
+type hotspot struct{ X, Y, W, H, DPR float64 }
+
+var (
+	hotMu    sync.Mutex
+	hot      hotspot
+	overLock bool
+)
+
+func setLockHotspot(x, y, w, h, dpr float64) {
+	hotMu.Lock()
+	hot = hotspot{x, y, w, h, dpr}
+	hotMu.Unlock()
+}
+
+func lockWatcher() {
+	for {
+		time.Sleep(40 * time.Millisecond)
+		h := window()
+		if h == 0 || st0 == nil {
+			continue
+		}
+		set := st0.GetSettings()
+		inside := false
+		if set.Locked {
+			hotMu.Lock()
+			hs := hot
+			hotMu.Unlock()
+			if page, ok := pageRect(h); ok && hs.DPR > 0 && hs.W > 0 {
+				var p point
+				pGetCursorPos.Call(uintptr(unsafe.Pointer(&p)))
+				pad := 4.0
+				l := float64(page.L) + (hs.X-pad)*hs.DPR
+				t := float64(page.T) + (hs.Y-pad)*hs.DPR
+				r := float64(page.L) + (hs.X+hs.W+pad)*hs.DPR
+				b := float64(page.T) + (hs.Y+hs.H+pad)*hs.DPR
+				fx, fy := float64(p.X), float64(p.Y)
+				inside = fx >= l && fx <= r && fy >= t && fy <= b
+			}
+		}
+		hotMu.Lock()
+		changed := inside != overLock
+		overLock = inside
+		hotMu.Unlock()
+		if changed {
+			applyExStyle(h, set)
+		}
+	}
+}
+
 func applyExStyle(h uintptr, set Settings) {
+	hotMu.Lock()
+	over := overLock
+	hotMu.Unlock()
 	ex, _, _ := pGetWindowLongPtrW.Call(h, gwlExStyle)
 	want := ex | wsExLayered
-	if set.Locked {
+	if set.Locked && !over {
 		want |= wsExTransparent
 	} else {
 		want &^= wsExTransparent
