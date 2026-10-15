@@ -108,7 +108,10 @@ func checkUpdate() (*UpdateInfo, error) {
 }
 
 // newerVersion reports whether a > b for dotted numeric versions ("0.10.1" > "0.9.3").
+// A pre-release suffix is ignored ("0.4.2-test" counts as 0.4.2).
 func newerVersion(a, b string) bool {
+	a, _, _ = strings.Cut(a, "-")
+	b, _, _ = strings.Cut(b, "-")
 	pa, pb := strings.Split(a, "."), strings.Split(b, ".")
 	for i := 0; i < len(pa) || i < len(pb); i++ {
 		var x, y int
