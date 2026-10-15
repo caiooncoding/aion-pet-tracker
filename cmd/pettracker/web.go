@@ -74,6 +74,7 @@ func serveWeb(port int, st *State) error {
 		_ = json.NewEncoder(w).Encode(st.data.List())
 	})
 	registerWindowAPI(mux, st)
+	registerMapAPI(mux)
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		return err

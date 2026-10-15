@@ -25,10 +25,12 @@ The top card shows the pet you're farming: the last pet you got a soul for, or e
 | **Nearby** | Pets whose monsters are around you right now, with how many are close |
 | **Recent** | Pets you just got souls for this session |
 | **All** | Your whole collection, closest to the next rank first |
+| **Map** | The zone map with the pet monsters around you as dots, one color per pet (grey = maxed), and a legend with souls and counts |
 
 - **Drag** the header to move the overlay, and use the bottom-right corner to resize it. It remembers both.
 - **Lock** (padlock button) makes the overlay click-through so it never gets in the way in game. The lock button itself stays clickable, and **Ctrl+Shift+P** toggles it from anywhere.
 - **Settings** (sliders button): opacity, hide maxed pets, and compact mode (only the top card).
+- **Map** works in Verteron, Altgard, Chaotic Lower Reshanta, Ishalgen and Poeta. The app works out the zone from the monsters it sees. Verteron is lined up out of the box; the other zones line up on their own after a minute of farming there.
 - **~N kills** is an estimate. It starts at 1 soul per kill and adjusts to the drop rate you actually get.
 
 Pets need 5 souls to unlock, 25 more for rank 2 and 75 more for rank 3 (max on global).
@@ -98,6 +100,7 @@ tools/            protocol research scripts
 
 - Protocol framing worked out with the help of [Aion2Flow](https://github.com/cloris-chan/Aion2Flow) (GPL-3.0), an open-source AION 2 combat meter. No code is copied; the monster names in `assets/npcs.json.gz` come from its resource pack.
 - Pet monster lists and icons: [wikily.gg](https://wikily.gg/aion-2/pets).
+- Zone maps and monster spawn points: [wikily.gg](https://wikily.gg/aion-2/interactive-map) (game art © NCSOFT). See `assets/README.md`.
 - Pet id ↔ name table: [aion2wiki.date](https://aion2wiki.date/pets).
 
 Not affiliated with or endorsed by NCSOFT. AION is a trademark of NCSOFT Corporation.

@@ -10,7 +10,7 @@ import (
 type Settings struct {
 	Opacity   int    `json:"opacity"` // 40..100 (% window opacity)
 	HideMaxed bool   `json:"hideMaxed"`
-	Tab       string `json:"tab"` // nearby | recent | all
+	Tab       string `json:"tab"` // nearby | recent | all | map
 	Locked    bool   `json:"locked"`
 	Compact   bool   `json:"compact"`
 	// Window rectangle in screen pixels (0 = default).
@@ -28,7 +28,7 @@ func (s *Settings) normalize() {
 		s.Opacity = d.Opacity
 	}
 	switch s.Tab {
-	case "nearby", "recent", "all":
+	case "nearby", "recent", "all", "map":
 	default:
 		s.Tab = d.Tab
 	}

@@ -94,6 +94,12 @@ Section "Install"
   File "/oname=LICENSE.txt" "..\LICENSE"
   File "/oname=README.md" "..\README.md"
 
+  ; zone maps for the Map tab (replaced on every install)
+  RMDir /r "$INSTDIR\maps"
+  SetOutPath "$INSTDIR\maps"
+  File /r "..\assets\maps\*.*"
+  SetOutPath "$INSTDIR"
+
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 
   CreateDirectory "$SMPROGRAMS\${APPNAME}"
@@ -125,6 +131,7 @@ Section "Uninstall"
   Delete "$INSTDIR\LICENSE.txt"
   Delete "$INSTDIR\README.md"
   Delete "$INSTDIR\Uninstall.exe"
+  RMDir /r "$INSTDIR\maps"
   RMDir "$INSTDIR"
 
   Delete "$SMPROGRAMS\${APPNAME}\${APPNAME}.lnk"

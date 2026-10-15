@@ -25,7 +25,7 @@ jobs:
       - name: Tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq nsis
+          sudo apt-get install -y -qq nsis zip
           go install github.com/akavel/rsrc@v0.10.2
 
       - name: Version
@@ -52,5 +52,5 @@ jobs:
             echo "v$V already released, skipping"
             exit 0
           fi
-          gh release create "v$V" "dist/PetTracker-Setup-$V.exe" dist/PetTracker.exe \
+          gh release create "v$V" "dist/PetTracker-Setup-$V.exe" "dist/PetTracker-$V-portable.zip" \
             --target "$GITHUB_SHA" --title "Pet Tracker $V" --notes-file .github/release-notes.md

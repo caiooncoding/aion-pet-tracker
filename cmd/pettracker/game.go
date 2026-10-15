@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -19,6 +20,9 @@ const (
 	opNpcState  = 0x4136
 	opNpcHP     = 0x008D
 	opMyKill    = 0xA6FF // arrives right after a monster you killed dies (exp gain)
+	opMove1     = 0x1A37 // entity movement updates
+	opMove2     = 0x1B37
+	opMove3     = 0x1C37
 	entityTTL   = 120 * time.Second
 	killWindow  = 4 * time.Second
 	recentLimit = 12
@@ -48,9 +52,11 @@ type Pet struct {
 }
 
 type entity struct {
-	code int
-	seen time.Time
-	dead bool
+	code    int
+	seen    time.Time
+	dead    bool
+	x, y, z float32
+	hasPos  bool
 }
 
 type kill struct {
@@ -68,9 +74,11 @@ type State struct {
 	NpcPet   map[int]int       `json:"npcPet"`   // npc code -> pet id (learned)
 	ListSeen time.Time         `json:"listSeen"` // last full list from login
 	Settings Settings          `json:"settings"`
+	Calibs   map[string]Calib  `json:"calibs"` // zone map calibration, learned
 	Extra    map[string]string `json:"extra,omitempty"`
 
 	entities  map[int]*entity
+	obs       []obs
 	kills     []kill
 	lastFrame time.Time
 	frames    int
@@ -89,6 +97,7 @@ func NewState(path string, data *PetData) *State {
 		path:     path,
 		data:     data,
 		Settings: defaultSettings(),
+		Calibs:   map[string]Calib{},
 	}
 	if b, err := os.ReadFile(path); err == nil {
 		_ = json.Unmarshal(b, s)
@@ -105,6 +114,9 @@ func NewState(path string, data *PetData) *State {
 			p.SessionAdd = 0
 		}
 		s.Settings.normalize()
+		if s.Calibs == nil {
+			s.Calibs = map[string]Calib{}
+		}
 	}
 	return s
 }
@@ -167,6 +179,8 @@ func (s *State) HandleFrame(f Frame, now time.Time) {
 		s.onNpc(f.Data, f.Op == opNpcSpawn, now)
 	case opNpcHP:
 		changed = s.onHP(f.Data, now)
+	case opMove1, opMove2, opMove3:
+		s.onMove(f.Data, now)
 	case opMyKill:
 		changed = s.onMyKill(now)
 	}
@@ -309,7 +323,62 @@ func (s *State) onNpc(d []byte, spawn bool, now time.Time) {
 	if code < 2_000_000 || code > 2_999_999 {
 		return
 	}
-	s.entities[id] = &entity{code: code, seen: now}
+	e := &entity{code: code, seen: now}
+	if old := s.entities[id]; old != nil && old.code == code {
+		e.dead, e.x, e.y, e.z, e.hasPos = old.dead, old.x, old.y, old.z, old.hasPos
+	}
+	// position: three floats right after the npc code (offset 9 from the entity id)
+	if x, y, z, ok := f32x3(d, o+9); ok && plausiblePos(x, y, z) {
+		e.x, e.y, e.z, e.hasPos = x, y, z, true
+	}
+	s.entities[id] = e
+	if e.hasPos {
+		s.observeSpawn(code, e.x, e.y)
+	}
+}
+
+// 1A37/1B37/1C37: entity varint, 1-2 header bytes, then x,y,z floats.
+// The header length varies, so take the offset whose position is closest
+// to where the entity was last seen.
+func (s *State) onMove(d []byte, now time.Time) {
+	id, k, ok := readVarint(d, 0)
+	if !ok {
+		return
+	}
+	e := s.entities[id]
+	if e == nil || !e.hasPos {
+		return
+	}
+	best, bd := -1, float32(4000*4000)
+	var bx, by, bz float32
+	for _, off := range []int{1, 2} {
+		x, y, z, ok := f32x3(d, k+off)
+		if !ok || !plausiblePos(x, y, z) {
+			continue
+		}
+		dx, dy := x-e.x, y-e.y
+		if dd := dx*dx + dy*dy; dd < bd {
+			best, bd, bx, by, bz = off, dd, x, y, z
+		}
+	}
+	if best >= 0 {
+		e.x, e.y, e.z, e.seen = bx, by, bz, now
+	}
+}
+
+func f32x3(b []byte, o int) (x, y, z float32, ok bool) {
+	if o < 0 || o+12 > len(b) {
+		return 0, 0, 0, false
+	}
+	x = math.Float32frombits(binary.LittleEndian.Uint32(b[o:]))
+	y = math.Float32frombits(binary.LittleEndian.Uint32(b[o+4:]))
+	z = math.Float32frombits(binary.LittleEndian.Uint32(b[o+8:]))
+	return x, y, z, true
+}
+
+func plausiblePos(x, y, z float32) bool {
+	ok := func(v float32, lim float32) bool { return v == v && v > -lim && v < lim }
+	return ok(x, 1e6) && ok(y, 1e6) && ok(z, 1e5) && (x > 1 || x < -1) && (y > 1 || y < -1)
 }
 
 // 008D: varint npc, varint 2, varint 1, varint 0, u32 hp
@@ -430,7 +499,8 @@ type View struct {
 	Version  string    `json:"version"`
 	Settings Settings  `json:"settings"`
 	Focus    *PetView  `json:"focus,omitempty"` // the pet you're farming right now
-	Session  int       `json:"session"`         // souls gained this session
+	Map      *MapView  `json:"map,omitempty"`
+	Session  int       `json:"session"` // souls gained this session
 	Live     bool      `json:"live"`
 	Frames   int       `json:"frames"`
 	HaveList bool      `json:"haveList"`
@@ -547,6 +617,7 @@ func (s *State) View(now time.Time) View {
 	for _, p := range s.Pets {
 		v.Session += p.SessionAdd
 	}
+	v.Map = s.mapView()
 	// focus: last pet you got a soul for (if recent), else the busiest unfinished pet nearby
 	if len(v.Recent) > 0 && v.Recent[0].Ago >= 0 && v.Recent[0].Ago < 300 && !v.Recent[0].Max {
 		f := v.Recent[0]

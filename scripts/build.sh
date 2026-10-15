@@ -25,6 +25,11 @@ GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath \
   -ldflags "-s -w -H=windowsgui -X main.version=$VERSION" \
   -o dist/PetTracker.exe ./cmd/pettracker
 
+echo "==> portable zip (exe + maps)"
+rm -f "dist/PetTracker-$VERSION-portable.zip"
+(cd assets && zip -qr "../dist/PetTracker-$VERSION-portable.zip" maps)
+(cd dist && zip -qj "PetTracker-$VERSION-portable.zip" PetTracker.exe)
+
 echo "==> installer"
 makensis -V2 -DVERSION="$VERSION" -DSRCDIR=../dist installer/pettracker.nsi
 

@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-var version = "0.3.0" // overridden at build time with -ldflags "-X main.version=..."
+var version = "0.4.0" // overridden at build time with -ldflags "-X main.version=..."
 
 func dataDir() string {
 	if d := os.Getenv("APPDATA"); d != "" {

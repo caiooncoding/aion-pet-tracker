@@ -72,6 +72,14 @@ func printSummary(st *State, at time.Time) {
 	for _, p := range v.Nearby {
 		fmt.Printf("  %-20s x%d  Lv%d %d/%d max=%v\n", p.Name, p.Nearby, p.Level, p.Souls, p.Need, p.Max)
 	}
+	if v.Map != nil {
+		fmt.Printf("MAP: %s calibrated=%v mobs=%d\n", v.Map.Label, v.Map.Calibrated, len(v.Map.Mobs))
+		for i, m := range v.Map.Mobs {
+			if i < 5 {
+				fmt.Printf("  pet %d at (%.0f, %.0f) max=%v\n", m.PetID, m.X, m.Y, m.Max)
+			}
+		}
+	}
 	fmt.Println("TOP:")
 	for i, p := range v.All {
 		if i >= 8 {
