@@ -4,16 +4,18 @@
 
 One Windows exe written in Go. It listens to the game's network traffic, keeps track of your pets, and shows the result in a small web page that sits on top of the game.
 
-```
-game server ──TCP──> your PC
-                       │  (Npcap copies the packets)
-                       ▼
-   capture → TCP reassembly → frame decoder → game state
-                                                   │
-                                     local web server :7319
-                                                   │  (live updates)
-                                                   ▼
-                                     overlay window (WebView2)
+```mermaid
+flowchart TD
+    G[Game server] -->|TCP| N[Npcap copies the packets]
+    N --> C[Capture]
+    C --> T[TCP reassembly]
+    T --> D[Frame decoder]
+    D --> S[(Game state)]
+    W[wikily.gg data<br/>weekly] -.-> S
+    S --> H[Local web server :7319]
+    H -->|live updates SSE| O[Overlay window<br/>WebView2]
+    O -->|button clicks| H
+    H -->|move / lock / resize| O
 ```
 
 ## Stack
@@ -71,12 +73,14 @@ The whole thing cross-compiles from Linux, so you don't need a Windows box to bu
 
 One page laid out top to bottom:
 
-```
-┌ header: PET TRACKER v0.x  [update] [search] [settings] [lock] [_] [x]
-├ focus card: the pet you're farming, souls, kills left, progress bar
-├ status strip: live dot · souls this session · pets owned
-├ tabs: Nearby | Recent | All | Map
-└ list or map (+ resize corner)
+```mermaid
+flowchart TD
+    A["Header<br/>PET TRACKER · update · search · settings · lock · minimize · close"]
+    B["Focus card<br/>pet you're farming · souls · kills left · bar"]
+    C["Status strip<br/>live dot · souls this session · pets owned"]
+    D["Tabs<br/>Nearby · Recent · All · Map"]
+    E["List or map<br/>+ resize corner"]
+    A --> B --> C --> D --> E
 ```
 
 - The page gets the whole view as JSON over SSE (`/api/events`) and re-renders. There's no state of its own in the page, apart from map zoom.
@@ -95,7 +99,11 @@ The installer only touches the first folder, so updates keep your progress.
 
 ## Release flow
 
-1. Bump `VERSION` (and `version` in `main.go`).
-2. Push to master.
-3. CI tests and builds, then publishes `vX.Y.Z` with the Setup exe and a portable zip.
-4. Running copies notice the release within 6 h and show **Update**.
+```mermaid
+flowchart LR
+    V[Bump VERSION] --> P[Push to master]
+    P --> CI[CI: test + build]
+    CI --> R[GitHub release<br/>Setup exe + portable zip]
+    R --> U[Running copies show<br/>Update within 6 h]
+    U --> I[Silent install<br/>+ restart]
+```
