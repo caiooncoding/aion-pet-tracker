@@ -113,6 +113,10 @@ func registerWindowAPI(mux *http.ServeMux, st *State) {
 			q := r.URL.Query()
 			f := func(k string) float64 { v, _ := strconv.ParseFloat(q.Get(k), 64); return v }
 			setLockHotspot(f("x"), f("y"), f("w"), f("h"), f("dpr"))
+		case "geom": // the page's own position on screen, so the clip lines up exactly
+			q := r.URL.Query()
+			f := func(k string) float64 { v, _ := strconv.ParseFloat(q.Get(k), 64); return v }
+			setPageGeom(pageGeom{OX: f("ox"), OY: f("oy"), IW: f("iw"), IH: f("ih"), DPR: f("dpr"), Mouse: q.Get("ox") != ""})
 		case "minimize":
 			windowMinimize()
 		case "close":

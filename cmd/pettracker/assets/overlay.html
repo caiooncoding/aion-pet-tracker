@@ -408,7 +408,19 @@
     lastHot = k;
     post(`/api/window?do=hotspot&x=${r.left}&y=${r.top}&w=${r.width}&h=${r.height}&dpr=${devicePixelRatio}`);
   }
-  window.addEventListener('resize', () => { lastHot = ''; reportLock(); });
+  window.addEventListener('resize', () => { lastHot = ''; lastGeom = ''; reportLock(); });
+  // Tell the app exactly where the page sits on screen (mouse screen minus client
+  // coordinates), so it can cut off Edge's title bar precisely.
+  let lastGeom = '', geomAt = 0;
+  document.addEventListener('mousemove', e => {
+    const now = Date.now();
+    if (now - geomAt < 400) return;
+    geomAt = now;
+    const k = [e.screenX - e.clientX, e.screenY - e.clientY, innerWidth, innerHeight, devicePixelRatio].join(',');
+    if (k === lastGeom) return;
+    lastGeom = k;
+    post(`/api/window?do=geom&ox=${e.screenX - e.clientX}&oy=${e.screenY - e.clientY}&iw=${innerWidth}&ih=${innerHeight}&dpr=${devicePixelRatio}`);
+  }, { passive: true });
   setInterval(reportLock, 2000);
 
   function connect() {

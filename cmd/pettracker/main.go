@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -40,6 +42,10 @@ func main() {
 			fmt.Println("error:", err)
 		}
 		return
+	}
+
+	if *replay == "" && *pcapFile == "" {
+		closeOtherInstance(*port) // starting it again replaces the running copy
 	}
 
 	data := LoadPetData(*dir)
@@ -133,4 +139,29 @@ func (m multiWriter) Write(p []byte) (int, error) {
 		_, _ = w.Write(p)
 	}
 	return len(p), nil
+}
+
+// closeOtherInstance asks a Pet Tracker that's already running on this port to
+// close (it saves first), then waits for the port to free up.
+func closeOtherInstance(port int) {
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	c, err := net.DialTimeout("tcp", addr, 300*time.Millisecond)
+	if err != nil {
+		return
+	}
+	c.Close()
+	logf("another copy is running, closing it")
+	cl := &http.Client{Timeout: 2 * time.Second}
+	if res, err := cl.Post("http://"+addr+"/api/window?do=close", "text/plain", nil); err == nil {
+		res.Body.Close()
+	}
+	for i := 0; i < 40; i++ {
+		time.Sleep(200 * time.Millisecond)
+		if c, err := net.DialTimeout("tcp", addr, 200*time.Millisecond); err != nil {
+			time.Sleep(300 * time.Millisecond)
+			return
+		} else {
+			c.Close()
+		}
+	}
 }

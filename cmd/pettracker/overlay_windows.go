@@ -40,6 +40,10 @@ var (
 	gdi32                       = syscall.NewLazyDLL("gdi32.dll")
 	pCreateRoundRectRgn         = gdi32.NewProc("CreateRoundRectRgn")
 	pGetWindowRgnBox            = user32.NewProc("GetWindowRgnBox")
+	pGetClientRect              = user32.NewProc("GetClientRect")
+	pClientToScreen             = user32.NewProc("ClientToScreen")
+	pGetDpiForWindow            = user32.NewProc("GetDpiForWindow")
+	pDwmGetWindowAttribute      = dwmapi.NewProc("DwmGetWindowAttribute")
 )
 
 const (
@@ -192,7 +196,26 @@ var (
 	lastClip rect
 )
 
+// pageRect is where the web page is on screen. The page measures itself (mouse
+// screen vs client coordinates) and reports it; that gives fixed insets from the
+// window edges, which beat guessing from Edge's child windows. Until the page has
+// reported, the Chrome_RenderWidgetHostHWND child is used.
 func pageRect(top uintptr) (rect, bool) {
+	var win rect
+	pGetWindowRect.Call(top, uintptr(unsafe.Pointer(&win)))
+	geoMu.Lock()
+	in, ok := insets, haveInsets
+	geoMu.Unlock()
+	if ok {
+		r := rect{win.L + in.L, win.T + in.T, win.R - in.R, win.B - in.B}
+		if r.R-r.L > 50 && r.B-r.T > 50 {
+			return r, true
+		}
+	}
+	return childRect(top)
+}
+
+func childRect(top uintptr) (rect, bool) {
 	childMu.Lock()
 	defer childMu.Unlock()
 	childFound = 0
@@ -204,6 +227,94 @@ func pageRect(top uintptr) (rect, bool) {
 	pGetWindowRect.Call(childFound, uintptr(unsafe.Pointer(&r)))
 	return r, r.R > r.L && r.B > r.T
 }
+
+// Page geometry reported by overlay.html, in CSS px.
+type pageGeom struct {
+	OX, OY, IW, IH, DPR float64 // content origin on screen (from a mouse event), inner size
+	Mouse               bool
+}
+
+var (
+	geoMu      sync.Mutex
+	insets     rect // page edges measured from the window edges, device px
+	haveInsets bool
+	geoLogged  int
+)
+
+func setPageGeom(g pageGeom) {
+	h := window()
+	if h == 0 || g.DPR <= 0 || g.IW <= 0 || g.IH <= 0 {
+		return
+	}
+	var win rect
+	pGetWindowRect.Call(h, uintptr(unsafe.Pointer(&win)))
+	child, _ := childRect(h)
+	if !g.Mouse {
+		return
+	}
+	pg := rect{int32(g.OX*g.DPR + .5), int32(g.OY*g.DPR + .5), 0, 0}
+	pg.R = pg.L + int32(g.IW*g.DPR+.5)
+	pg.B = pg.T + int32(g.IH*g.DPR+.5)
+	in := rect{pg.L - win.L, pg.T - win.T, win.R - pg.R, win.B - pg.B}
+	if in.L < 0 || in.T < 0 || in.R < 0 || in.B < 0 || in.T > 200 || in.L > 100 {
+		logf("page geometry looks off, ignoring: page %v window %v", pg, win)
+		return
+	}
+	geoMu.Lock()
+	changed := !haveInsets || in != insets
+	insets, haveInsets = in, true
+	n := geoLogged
+	if changed {
+		geoLogged++
+	}
+	geoMu.Unlock()
+	if changed && n < 5 {
+		logf("page measured itself: insets L%d T%d R%d B%d (child window said T%d B%d)",
+			in.L, in.T, in.R, in.B, child.T-win.T, win.B-child.B)
+	}
+	if changed {
+		clipToPage(h)
+	}
+}
+
+// dumpWindow logs everything about the overlay window's geometry, for debugging.
+func dumpWindow(h uintptr) {
+	var win, cl, ext rect
+	pGetWindowRect.Call(h, uintptr(unsafe.Pointer(&win)))
+	pGetClientRect.Call(h, uintptr(unsafe.Pointer(&cl)))
+	var o point
+	pClientToScreen.Call(h, uintptr(unsafe.Pointer(&o)))
+	pDwmGetWindowAttribute.Call(h, 9, uintptr(unsafe.Pointer(&ext)), unsafe.Sizeof(ext)) // DWMWA_EXTENDED_FRAME_BOUNDS
+	dpi, _, _ := pGetDpiForWindow.Call(h)
+	var box rect
+	kind, _, _ := pGetWindowRgnBox.Call(h, uintptr(unsafe.Pointer(&box)))
+	st, _, _ := pGetWindowLongPtrW.Call(h, gwlStyle)
+	ex, _, _ := pGetWindowLongPtrW.Call(h, gwlExStyle)
+	logf("window: rect %v client %dx%d at (%d,%d) frame %v dpi %d style %#x ex %#x region kind %d box %v",
+		win, cl.R, cl.B, o.X, o.Y, ext, dpi, st, ex, kind, box)
+	dumpMu.Lock()
+	dumpLines = dumpLines[:0]
+	pEnumChildWindows.Call(h, dumpCB, 0)
+	lines := append([]string(nil), dumpLines...)
+	dumpMu.Unlock()
+	for _, l := range lines {
+		logf("  child %s", l)
+	}
+}
+
+var (
+	dumpMu    sync.Mutex
+	dumpLines []string
+	dumpCB    = syscall.NewCallback(func(c, _ uintptr) uintptr {
+		buf := make([]uint16, 128)
+		n, _, _ := pGetClassNameW.Call(c, uintptr(unsafe.Pointer(&buf[0])), 128)
+		var r rect
+		pGetWindowRect.Call(c, uintptr(unsafe.Pointer(&r)))
+		v, _, _ := pIsWindowVisible.Call(c)
+		dumpLines = append(dumpLines, fmt.Sprintf("%s visible=%d rect %v", syscall.UTF16ToString(buf[:n]), v, r))
+		return 1
+	})
+)
 
 // clipToPage hides Edge's title bar and borders by clipping the window to the page.
 // Edge resets the window region on its own (resize, focus, theme changes), so this
@@ -349,6 +460,7 @@ func keepOnTop(cmd *exec.Cmd) {
 			if h != last {
 				logf("overlay window ready")
 				last = h
+				go func(h uintptr) { time.Sleep(3 * time.Second); dumpWindow(h) }(h)
 				go func(h uintptr) { // twice: Edge can reset the icon once the page loads
 					setWindowIdentity(h)
 					time.Sleep(4 * time.Second)

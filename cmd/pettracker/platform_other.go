@@ -16,3 +16,10 @@ func windowClose()                           {}
 func windowResize(h int)                     {}
 func setLockHotspot(x, y, w, h, dpr float64) {}
 func runInstaller(path string) error         { return errors.New("only on Windows") }
+
+type pageGeom struct {
+	OX, OY, IW, IH, DPR float64
+	Mouse               bool
+}
+
+func setPageGeom(pageGeom) {}
