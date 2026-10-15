@@ -18,15 +18,18 @@ Windows SmartScreen may warn about an unknown publisher, because the installer i
 
 ## Using it
 
+The top card shows the pet you're farming: the last pet you got a soul for, or else the closest unfinished pet nearby. It has souls, rank and an estimate of kills left. Below it:
+
 | Tab | Shows |
 |---|---|
 | **Nearby** | Pets whose monsters are around you right now, with how many are close |
 | **Recent** | Pets you just got souls for this session |
 | **All** | Your whole collection, closest to the next rank first |
 
-- **Hide maxed** hides pets that are already rank 3.
+- **Drag** the header to move the overlay, and use the bottom-right corner to resize it. It remembers both.
+- **Lock** (padlock button) makes the overlay click-through so it never gets in the way in game. The lock button itself stays clickable, and **Ctrl+Shift+P** toggles it from anywhere.
+- **Settings** (sliders button): opacity, hide maxed pets, and compact mode (only the top card).
 - **~N kills** is an estimate. It starts at 1 soul per kill and adjusts to the drop rate you actually get.
-- Close the overlay window to quit.
 
 Pets need 5 souls to unlock, 25 more for rank 2 and 75 more for rank 3 (max on global).
 

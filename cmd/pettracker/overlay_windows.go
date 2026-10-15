@@ -315,6 +315,11 @@ func keepOnTop(cmd *exec.Cmd) {
 			if h != last {
 				logf("overlay window ready")
 				last = h
+				go func(h uintptr) { // twice: Edge can reset the icon once the page loads
+					setWindowIdentity(h)
+					time.Sleep(4 * time.Second)
+					setWindowIdentity(h)
+				}(h)
 				// put it exactly where it was last time (saved in screen pixels)
 				set := st0.GetSettings()
 				pSetWindowPos.Call(h, 0, uintptr(set.X), uintptr(set.Y), uintptr(set.W), uintptr(set.H), swpNoZOrder|swpNoActivate)

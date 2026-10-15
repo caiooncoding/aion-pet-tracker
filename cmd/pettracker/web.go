@@ -12,6 +12,9 @@ import (
 //go:embed assets/overlay.html
 var overlayHTML []byte
 
+//go:embed assets/icon.png
+var iconPNG []byte
+
 func serveWeb(port int, st *State) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -22,6 +25,11 @@ func serveWeb(port int, st *State) error {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		_, _ = w.Write(overlayHTML)
+	})
+	mux.HandleFunc("/icon.png", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Cache-Control", "max-age=86400")
+		_, _ = w.Write(iconPNG)
 	})
 	mux.HandleFunc("/api/view", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
