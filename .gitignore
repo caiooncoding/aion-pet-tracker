@@ -1,0 +1,8 @@
+dist/
+*.syso
+*.pcap
+*.pcapng
+*.stream.log
+__pycache__/
+.DS_Store
+/pettracker
