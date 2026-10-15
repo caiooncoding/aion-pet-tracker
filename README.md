@@ -62,7 +62,7 @@ Needs Go 1.24+, [NSIS 3](https://nsis.sourceforge.io/) and `rsrc`. The build run
 
 ```sh
 go install github.com/akavel/rsrc@v0.10.2
-scripts/build.sh 0.2.0        # -> dist/PetTracker.exe, dist/PetTracker-Setup-0.2.0.exe
+scripts/build.sh              # version from VERSION -> dist/PetTracker.exe + dist/PetTracker-Setup-<version>.exe
 go test ./...
 ```
 
@@ -98,6 +98,11 @@ tools/            protocol research scripts
 - Pet id ↔ name table: [aion2wiki.date](https://aion2wiki.date/pets).
 
 Not affiliated with or endorsed by NCSOFT. AION is a trademark of NCSOFT Corporation.
+
+
+## Releasing
+
+Bump the number in `VERSION` and push to `master`. CI builds, tests and publishes `vX.Y.Z` with the installer attached.
 
 ## License
 

@@ -1,10 +1,13 @@
 name: build
 
+# Every push builds and tests. When VERSION changes to a number that has no
+# release yet, the push to master also publishes "vX.Y.Z" with the installer.
+
 on:
   push:
     branches: [master]
-    tags: ["v*"]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -14,8 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
@@ -29,12 +30,7 @@ jobs:
 
       - name: Version
         id: v
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-          else
-            echo "version=0.0.0-dev" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
 
       - name: Build
         run: |
@@ -47,14 +43,14 @@ jobs:
           path: dist/*
 
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           V="${{ steps.v.outputs.version }}"
           if gh release view "v$V" >/dev/null 2>&1; then
-            gh release upload "v$V" "dist/PetTracker-Setup-$V.exe" dist/PetTracker.exe --clobber
-          else
-            gh release create "v$V" "dist/PetTracker-Setup-$V.exe" dist/PetTracker.exe \
-              --title "Pet Tracker $V" --generate-notes
+            echo "v$V already released, skipping"
+            exit 0
           fi
+          gh release create "v$V" "dist/PetTracker-Setup-$V.exe" dist/PetTracker.exe \
+            --target "$GITHUB_SHA" --title "Pet Tracker $V" --notes-file .github/release-notes.md

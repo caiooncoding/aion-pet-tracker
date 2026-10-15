@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Builds dist/PetTracker.exe and dist/PetTracker-Setup-<version>.exe.
 # Needs: Go 1.24+, makensis (NSIS 3), rsrc (go install github.com/akavel/rsrc@v0.10.2).
-# Usage: scripts/build.sh [version]   (default: latest git tag, without the leading "v")
+# Usage: scripts/build.sh [version]   (default: the VERSION file)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="${1:-$(git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)}"
+VERSION="${1:-$(cat VERSION)}"
 VERSION="${VERSION#v}"
 echo "==> Pet Tracker $VERSION"
 
