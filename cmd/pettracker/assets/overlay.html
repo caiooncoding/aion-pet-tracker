@@ -6,160 +6,239 @@
 <title>Pet Tracker</title>
 <style>
   :root {
-    --bg: #0f151b;
-    --panel: #151d25;
-    --line: #243241;
-    --text: #e8eef3;
-    --muted: #8a99a8;
+    --bg: #15181c;
+    --bg-2: #1b1f24;
+    --bg-3: #22272d;
+    --line: #2a3038;
+    --text: #e9edf1;
+    --muted: #8b949e;
+    --dim: #5f6873;
     --accent: #4fd1b5;
-    --track: #223040;
-    --max: #6b7a8a;
+    --accent-ink: #062a22;
     --warn: #e0a85a;
+    --track: #262c33;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
     font: 13px/1.3 "Segoe UI", system-ui, sans-serif; overflow: hidden; user-select: none; }
-  .app { display: flex; flex-direction: column; height: 100%; }
-  header { display: flex; align-items: center; gap: 8px; padding: 10px 12px 8px; }
-  h1 { font-size: 15px; font-weight: 600; margin: 0; flex: 1; letter-spacing: .2px; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--max); flex: none; }
-  .dot.live { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
-  label.hide { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; cursor: pointer; }
-  label.hide input { accent-color: var(--accent); margin: 0; }
-  .tabs { display: flex; gap: 6px; padding: 0 12px 8px; }
-  .tab { flex: 1; padding: 6px 0; border-radius: 6px; border: 1px solid var(--line); background: transparent;
-    color: var(--muted); font: inherit; cursor: pointer; }
-  .tab.on { background: var(--accent); border-color: var(--accent); color: #062a22; font-weight: 600; }
-  .search { margin: 0 12px 8px; padding: 6px 9px; border-radius: 6px; border: 1px solid var(--line);
-    background: var(--panel); color: var(--text); font: inherit; outline: none; display: none; }
+  button { font: inherit; color: inherit; }
+  .app { display: flex; flex-direction: column; height: 100%; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+
+  /* header */
+  .top { display: flex; align-items: center; gap: 6px; padding: 9px 10px 6px 14px; cursor: move; }
+  .brand { flex: 1; font-size: 11px; font-weight: 700; letter-spacing: .6px; color: var(--muted); white-space: nowrap; }
+  .brand small { font-weight: 500; letter-spacing: 0; color: var(--dim); margin-left: 4px; font-size: 11px; }
+  .ib { width: 26px; height: 24px; display: grid; place-items: center; border: 0; border-radius: 5px;
+    background: transparent; color: var(--muted); cursor: pointer; flex: none; }
+  .ib:hover { background: var(--bg-3); color: var(--text); }
+  .ib.on { color: var(--accent); }
+  .ib svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* focus block */
+  .focus { display: grid; grid-template-columns: 40px 1fr auto; gap: 2px 12px; align-items: center; padding: 4px 14px 12px; cursor: move; }
+  .focus .pic { grid-row: span 2; width: 40px; height: 40px; border-radius: 8px; background: var(--bg-3) center/cover no-repeat; }
+  .focus .nm { font-size: 19px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .focus .sub { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .focus .big { grid-row: span 2; text-align: right; font-variant-numeric: tabular-nums; }
+  .focus .big b { display: block; font-size: 18px; }
+  .focus .big span { color: var(--muted); font-size: 11px; }
+  .focus .bar { grid-column: 1 / 4; margin-top: 8px; }
+  .focus.empty .nm { font-size: 15px; color: var(--muted); font-weight: 600; }
+
+  /* stat strip (like NOT METER's bottom bar) */
+  .strip { display: flex; align-items: center; gap: 10px; padding: 7px 14px; border-top: 1px solid var(--line); background: var(--bg-2); font-size: 12px; color: var(--muted); }
+  .strip .grow { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .strip .grow span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .strip b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .strip .sep { width: 1px; height: 12px; background: var(--line); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); flex: none; }
+  .dot.live { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
+
+  /* tabs + list */
+  .tabs { display: flex; gap: 2px; padding: 8px 10px 6px; border-top: 1px solid var(--line); }
+  .tab { border: 0; background: transparent; color: var(--muted); padding: 4px 9px; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 600; }
+  .tab:hover { color: var(--text); }
+  .tab.on { background: var(--bg-3); color: var(--text); }
+  .tab i { font-style: normal; color: var(--dim); font-weight: 500; margin-left: 3px; }
+  .search { display: none; margin: 0 10px 6px; padding: 5px 9px; border-radius: 6px; border: 1px solid var(--line);
+    background: var(--bg-2); color: var(--text); font: inherit; outline: none; }
   .search.show { display: block; }
-  .list { flex: 1; overflow-y: auto; padding: 0 8px 8px; }
-  .list::-webkit-scrollbar { width: 6px; } .list::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
-  .row { display: grid; grid-template-columns: 44px 1fr auto; gap: 3px 10px; align-items: center;
-    padding: 8px 6px; border-bottom: 1px solid var(--line); }
+  .search:focus { border-color: var(--accent); }
+  .list { flex: 1; overflow-y: auto; padding: 0 6px 6px; }
+  .list::-webkit-scrollbar { width: 5px; } .list::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+  .row { display: grid; grid-template-columns: 30px 1fr auto; gap: 1px 10px; align-items: center; padding: 6px 8px; border-radius: 6px; }
+  .row:hover { background: var(--bg-2); }
   .row.flash { animation: flash 1.2s ease-out; }
-  @keyframes flash { from { background: #1f4a42; } to { background: transparent; } }
-  .icon { grid-row: span 3; width: 44px; height: 44px; border-radius: 6px; background: var(--panel) center/cover no-repeat;
-    display: grid; place-items: center; color: var(--muted); font-size: 18px; }
-  .name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .count { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
-  .sub { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .hint { color: var(--muted); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .hint.near { color: var(--warn); }
-  .bar { grid-column: 2 / 4; height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; }
+  @keyframes flash { from { background: #1d4239; } to { background: transparent; } }
+  .row .pic { grid-row: span 2; width: 30px; height: 30px; border-radius: 6px; background: var(--bg-3) center/cover no-repeat; }
+  .row .nm { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .ct { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+  .row .sub { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .hint { color: var(--muted); font-size: 11px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .row .hint.near { color: var(--warn); }
+  .row .bar { grid-column: 2 / 4; margin-top: 3px; }
+  .row.max .nm, .row.max .sub { color: var(--dim); }
+  .chip { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: var(--bg-3); color: var(--muted); letter-spacing: .3px; }
+  .bar { height: 3px; border-radius: 2px; background: var(--track); overflow: hidden; }
   .bar i { display: block; height: 100%; background: var(--accent); border-radius: 2px; transition: width .4s; }
-  .row.max .name, .row.max .sub { color: var(--max); }
-  .chip { font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: var(--track); color: var(--muted); }
-  .empty { color: var(--muted); padding: 24px 14px; text-align: center; line-height: 1.5; }
-  footer { padding: 6px 12px 8px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; }
-  button.icon-btn { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 14px; padding: 2px 4px; }
-  button.icon-btn:hover { color: var(--text); }
-  .row.unnamed { cursor: pointer; }
-  .row.unnamed:hover { background: var(--panel); }
-  .namer { grid-column: 2 / 4; display: flex; gap: 6px; }
-  .namer input { flex: 1; min-width: 0; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--accent);
-    background: var(--panel); color: var(--text); font: inherit; outline: none; }
-  .namer button { padding: 5px 9px; border-radius: 6px; border: 0; background: var(--accent); color: #062a22; font: inherit; font-weight: 600; cursor: pointer; }
+  .empty { color: var(--muted); padding: 22px 14px; text-align: center; line-height: 1.5; font-size: 12px; }
+
+  /* settings */
+  .panel { display: none; flex-direction: column; gap: 12px; padding: 10px 14px 14px; border-top: 1px solid var(--line); background: var(--bg-2); }
+  .panel.show { display: flex; }
+  .panel h3 { margin: 0; font-size: 11px; letter-spacing: .6px; color: var(--muted); font-weight: 700; }
+  .opt { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .opt small { display: block; color: var(--dim); font-size: 11px; }
+  input[type=range] { width: 130px; accent-color: var(--accent); }
+  .tog { position: relative; width: 32px; height: 18px; border-radius: 9px; background: var(--bg-3); border: 1px solid var(--line); cursor: pointer; flex: none; }
+  .tog::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--muted); transition: left .15s; }
+  .tog.on { background: var(--accent); border-color: var(--accent); }
+  .tog.on::after { left: 16px; background: var(--accent-ink); }
+  kbd { font: 11px "Segoe UI", sans-serif; padding: 1px 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; color: var(--text); }
+
+  .grip { position: fixed; right: 1px; bottom: 1px; width: 14px; height: 14px; cursor: nwse-resize; opacity: .5; }
+  .grip:hover { opacity: 1; }
+  .grip svg { width: 14px; height: 14px; stroke: var(--muted); stroke-width: 1.5; }
+
+  body.compact .tabs, body.compact .search, body.compact .list { display: none; }
+  body.locked .top .ib:not(#lockBtn), body.locked .grip { visibility: hidden; }
 </style>
 </head>
 <body>
 <div class="app">
-  <header>
-    <span class="dot" id="dot" title="Waiting for game traffic"></span>
-    <h1>Pet Tracker</h1>
-    <label class="hide"><input type="checkbox" id="hideMax"> Hide maxed</label>
-    <button class="icon-btn" id="searchBtn" title="Search">&#x2315;</button>
-  </header>
+  <div class="top" id="drag">
+    <div class="brand">PET TRACKER<small id="ver"></small></div>
+    <button class="ib" id="searchBtn" title="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg></button>
+    <button class="ib" id="setBtn" title="Settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
+    <button class="ib" id="lockBtn" title="Lock (click-through) — Ctrl+Shift+P"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path id="shackle" d="M8 11V8a4 4 0 0 1 8 0"/></svg></button>
+    <button class="ib" id="minBtn" title="Minimize"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button>
+    <button class="ib" id="closeBtn" title="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+
+  <div class="focus" id="focus"></div>
+
+  <div class="strip">
+    <div class="grow"><span class="dot" id="dot"></span><span id="status">Starting…</span></div>
+    <span id="stSouls"></span><span class="sep"></span><span id="stPets"></span>
+  </div>
+
+  <div class="panel" id="panel">
+    <h3>SETTINGS</h3>
+    <div class="opt"><div>Opacity<small id="opv"></small></div><input type="range" id="opacity" min="40" max="100" step="2"></div>
+    <div class="opt"><div>Hide maxed pets</div><div class="tog" id="hideMaxed"></div></div>
+    <div class="opt"><div>Compact<small>Only the pet you're farming</small></div><div class="tog" id="compact"></div></div>
+    <div class="opt"><div>Lock / unlock<small>Clicks go through to the game</small></div><div><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>P</kbd></div></div>
+  </div>
+
   <div class="tabs">
-    <button class="tab" data-tab="recent">Recent</button>
-    <button class="tab" data-tab="nearby">Nearby</button>
-    <button class="tab" data-tab="all">All</button>
+    <button class="tab" data-tab="nearby">Nearby<i id="nNearby"></i></button>
+    <button class="tab" data-tab="recent">Recent<i id="nRecent"></i></button>
+    <button class="tab" data-tab="all">All<i id="nAll"></i></button>
   </div>
   <input class="search" id="search" placeholder="Search pets" autocomplete="off">
   <div class="list" id="list"></div>
-  <datalist id="petnames"></datalist>
-  <footer><span id="status">Starting…</span><span id="hint"></span></footer>
 </div>
+<div class="grip" id="grip" title="Resize"><svg viewBox="0 0 14 14"><path d="M13 5L5 13M13 9L9 13"/></svg></div>
 <script>
 (() => {
-  let view = null, naming = 0, petNames = [];
-  const lastSouls = new Map();
+  let view = null, set = { tab: 'nearby', hideMaxed: false, opacity: 92, compact: false, locked: false };
+  const lastSig = new Map();
   const $ = id => document.getElementById(id);
-  const store = {
-    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
-    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
-  };
-  let tab = store.get('tab', 'nearby');
-  $('hideMax').checked = store.get('hideMax', false);
-
-  document.querySelectorAll('.tab').forEach(b => b.onclick = () => { tab = b.dataset.tab; store.set('tab', tab); render(); });
-  $('hideMax').onchange = () => { store.set('hideMax', $('hideMax').checked); render(); };
-  $('searchBtn').onclick = () => {
-    const s = $('search'); s.classList.toggle('show');
-    if (s.classList.contains('show')) s.focus(); else { s.value = ''; render(); }
-  };
-  $('search').oninput = render;
-
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ago = s => s < 0 ? '' : s < 60 ? s + 's ago' : s < 3600 ? Math.floor(s / 60) + 'm ago' : Math.floor(s / 3600) + 'h ago';
+  const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).catch(() => {});
+  const save = patch => { Object.assign(set, patch); post('/api/settings', patch); render(); };
 
-  function row(p) {
-    const known = p.need >= 0;
-    const pct = p.max ? 100 : known && p.need ? Math.min(100, p.souls / p.need * 100) : 0;
-    const icon = p.icon ? `style="background-image:url('${esc(p.icon)}')"` : '';
-    const right = p.max ? '<span class="chip">✓ MAX</span>'
-      : known ? `<span class="count">${p.souls} / ${p.need}</span>` : '<span class="count">?</span>';
-    let sub = known ? (p.level === 0 ? 'Not unlocked' : 'Rank ' + p.level) : 'Not tracked yet';
-    const unnamed = false;
-    if (tab === 'recent' && p.ago >= 0) sub += ' · ' + ago(p.ago) + (p.session ? ` · +${p.session}` : '');
-    let hint = '';
-    if (tab === 'nearby' && p.nearby) hint = `<span class="hint near">${p.nearby} nearby</span>`;
-    if (!p.max && known && p.killsLeft > 0) {
-      if (hint) sub += ` · ~${p.killsLeft} kills`;
-      else hint = `<span class="hint">~${p.killsLeft} kills</span>`;
+  // window chrome
+  const startDrag = (e, what) => { if (e.button === 0) { e.preventDefault(); post('/api/window?do=' + what); } };
+  ['drag', 'focus'].forEach(id => $(id).addEventListener('mousedown', e => { if (!e.target.closest('button')) startDrag(e, 'move'); }));
+  $('grip').addEventListener('mousedown', e => startDrag(e, 'resize'));
+  $('closeBtn').onclick = () => post('/api/window?do=close');
+  $('minBtn').onclick = () => post('/api/window?do=minimize');
+  $('lockBtn').onclick = () => save({ locked: !set.locked });
+  $('setBtn').onclick = () => { $('panel').classList.toggle('show'); $('setBtn').classList.toggle('on'); };
+  $('searchBtn').onclick = () => {
+    const s = $('search'); s.classList.toggle('show'); $('searchBtn').classList.toggle('on');
+    if (s.classList.contains('show')) { if (set.compact) save({ compact: false }); s.focus(); } else { s.value = ''; render(); }
+  };
+  $('search').oninput = render;
+  document.querySelectorAll('.tab').forEach(b => b.onclick = () => save({ tab: b.dataset.tab }));
+  $('opacity').oninput = e => { $('opv').textContent = e.target.value + '%'; };
+  $('opacity').onchange = e => save({ opacity: +e.target.value });
+  $('hideMaxed').onclick = () => save({ hideMaxed: !set.hideMaxed });
+  $('compact').onclick = () => {
+    save({ compact: !set.compact });
+    $('panel').classList.remove('show'); $('setBtn').classList.remove('on');
+    requestAnimationFrame(() => {
+      const h = set.compact ? Math.ceil((document.querySelector('.app').scrollHeight - $('list').offsetHeight + 2) * devicePixelRatio) : 0;
+      post('/api/window?do=fit&h=' + h);
+    });
+  };
+
+  function need(p) { return p.max ? '' : p.level === 0 ? `${p.need - p.souls} to unlock` : `Rank ${p.level}`; }
+  function kills(p) { return !p.max && p.need > 0 && p.killsLeft > 0 ? `~${p.killsLeft} kills` : ''; }
+  function pct(p) { return p.max ? 100 : p.need > 0 ? Math.min(100, p.souls / p.need * 100) : 0; }
+  function pic(p) { return p.icon ? ` style="background-image:url('${esc(p.icon)}')"` : ''; }
+
+  function renderFocus() {
+    const f = view && view.focus, el = $('focus');
+    if (!f) {
+      el.className = 'focus empty';
+      el.innerHTML = `<div class="pic"></div><div class="nm">${view && view.live ? 'No pet monsters nearby' : 'Waiting for the game'}</div><div class="big"></div>
+        <div class="sub">${view && view.live ? 'Go find something to farm' : 'Start before you log in'}</div>`;
+      return;
     }
-    const sig = p.souls + p.level * 1000;
-    const flash = p.id && lastSouls.has(p.id) && lastSouls.get(p.id) !== sig ? ' flash' : '';
-    if (naming && naming === p.id) return `<div class="row">
-      <div class="icon">?</div>
-      <div class="namer"><input id="nameInput" list="petnames" placeholder="Which pet is this? (${p.souls}/${p.need})">
-      <button id="nameSave">Save</button></div>
-      <div class="sub" style="grid-column:2/4">Pick the pet whose window shows ${p.souls}/${p.need}, rank ${p.level}</div>
-    </div>`;
-    return `<div class="row${p.max ? ' max' : ''}${flash}${unnamed ? ' unnamed' : ''}"${unnamed ? ` data-id="${p.id}"` : ''}>
-      <div class="icon" ${icon}>${p.icon ? '' : '?'}</div>
-      <div class="name" title="${esc(p.name)}">${esc(p.name)}</div>${right}
-      <div class="sub">${esc(sub)}</div>${hint || '<span></span>'}
-      ${known ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ''}
-    </div>`;
+    el.className = 'focus';
+    const sub = [need(f), f.genus, f.nearby ? `${f.nearby} nearby` : ''].filter(Boolean).join(' · ');
+    el.innerHTML = `<div class="pic"${pic(f)}></div>
+      <div class="nm" title="${esc(f.name)}">${esc(f.name)}</div>
+      <div class="big"><b>${f.souls} / ${f.need}</b><span>${esc(kills(f))}</span></div>
+      <div class="sub">${esc(sub)}</div>
+      <div class="bar"><i style="width:${pct(f)}%"></i></div>`;
   }
 
-  async function loadNames() {
-    try { petNames = await (await fetch('/api/pets')).json(); } catch { petNames = []; }
-    $('petnames').innerHTML = petNames.map(n => `<option value="${esc(n.name)}">${esc(n.genus)}</option>`).join('');
+  function row(p, tab) {
+    const known = p.need >= 0;
+    const right = p.max ? '<span class="chip">MAX</span>' : known ? `<span class="ct">${p.souls} / ${p.need}</span>` : '<span class="ct">–</span>';
+    let sub = known ? (p.max ? 'Rank 3' : need(p)) : 'Not tracked';
+    if (tab === 'recent' && p.ago >= 0) sub += ' · ' + ago(p.ago) + (p.session ? ` · +${p.session}` : '');
+    let hint = tab === 'nearby' && p.nearby ? `<span class="hint near">${p.nearby} nearby</span>` : '';
+    const k = kills(p);
+    if (k) { if (hint) sub += ' · ' + k; else hint = `<span class="hint">${k}</span>`; }
+    const sig = p.souls + p.level * 1000;
+    const flash = p.id && lastSig.has(p.id) && lastSig.get(p.id) !== sig ? ' flash' : '';
+    return `<div class="row${p.max ? ' max' : ''}${flash}">
+      <div class="pic"${pic(p)}></div>
+      <div class="nm" title="${esc(p.name)}">${esc(p.name)}</div>${right}
+      <div class="sub">${esc(sub)}</div>${hint || '<span></span>'}
+      ${known ? `<div class="bar"><i style="width:${pct(p)}%"></i></div>` : ''}
+    </div>`;
   }
-  $('list').addEventListener('click', e => {
-    const r = e.target.closest('.row.unnamed');
-    if (r && !naming) { naming = +r.dataset.id; if (!petNames.length) loadNames(); render(); const i = $('nameInput'); if (i) i.focus(); }
-  });
-  $('list').addEventListener('click', async e => {
-    if (e.target.id !== 'nameSave') return;
-    const v = $('nameInput').value.trim().toLowerCase();
-    const hit = petNames.find(n => n.name.toLowerCase() === v);
-    if (hit) await fetch('/api/name', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: naming, slug: hit.slug }) });
-    naming = 0; render();
-  });
-  $('list').addEventListener('keydown', e => {
-    if (e.target.id === 'nameInput' && e.key === 'Enter') $('nameSave').click();
-    if (e.target.id === 'nameInput' && e.key === 'Escape') { naming = 0; render(); }
-  });
 
   function render() {
-    if (naming && document.activeElement && document.activeElement.id === 'nameInput') return; // don't wipe the editor while typing
-    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
-    const list = $('list');
-    if (!view) { list.innerHTML = '<div class="empty">Starting…</div>'; return; }
-    let items = view[tab] || [];
+    document.body.classList.toggle('compact', !!set.compact);
+    document.body.classList.toggle('locked', !!set.locked);
+    $('lockBtn').classList.toggle('on', !!set.locked);
+    $('shackle').setAttribute('d', set.locked ? 'M8 11V8a4 4 0 0 1 8 0v3' : 'M8 11V8a4 4 0 0 1 8 0');
+    $('hideMaxed').classList.toggle('on', !!set.hideMaxed);
+    $('compact').classList.toggle('on', !!set.compact);
+    if (document.activeElement !== $('opacity')) { $('opacity').value = set.opacity; $('opv').textContent = set.opacity + '%'; }
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === set.tab));
+    if (!view) return;
+
+    $('ver').textContent = 'v' + view.version;
+    $('dot').classList.toggle('live', !!view.live);
+    $('status').textContent = set.locked ? 'Locked · Ctrl+Shift+P' : view.live ? 'Live' : 'Waiting for game';
+    $('stSouls').innerHTML = `<b>+${view.session || 0}</b> souls`;
+    const owned = (view.all || []).filter(p => p.level > 0).length;
+    $('stPets').innerHTML = view.haveList ? `<b>${owned}</b> pets` : 'no pet list yet';
+    const vis = l => (l || []).filter(p => !set.hideMaxed || !p.max).length;
+    $('nNearby').textContent = vis(view.nearby) || '';
+    $('nRecent').textContent = vis(view.recent) || '';
+    $('nAll').textContent = '';
+    renderFocus();
+
+    let items = view[set.tab] || [];
     const q = $('search').value.trim().toLowerCase();
     if (q) {
       const seen = new Set();
@@ -169,32 +248,31 @@
         seen.add(k); return true;
       });
     }
-    if ($('hideMax').checked) items = items.filter(p => !p.max);
+    if (set.hideMaxed) items = items.filter(p => !p.max);
+    const list = $('list');
     if (!items.length) {
       const msg = q ? 'No pets match.'
-        : !view.live ? 'Waiting for the game…<br>Start Pet Tracker before you log in so it sees your pet list.'
-        : !view.haveList && tab === 'all' ? 'Go to character select and log back in so the tracker can read your pet list.'
-        : tab === 'recent' ? 'No souls picked up yet this session.'
-        : tab === 'nearby' ? 'No pet monsters around you right now.'
-        : 'Nothing to show.';
+        : !view.live ? 'Start Pet Tracker before you log in so it can read your pet list.'
+        : !view.haveList && set.tab === 'all' ? 'Go to character select and log back in so the tracker can read your pet list.'
+        : set.tab === 'recent' ? 'No souls picked up yet this session.'
+        : set.tab === 'nearby' ? 'No pet monsters around you right now.' : 'Nothing to show.';
       list.innerHTML = `<div class="empty">${msg}</div>`;
     } else {
-      list.innerHTML = items.map(row).join('');
+      list.innerHTML = items.map(p => row(p, set.tab)).join('');
     }
-    (view.all || []).forEach(p => lastSouls.set(p.id, p.souls + p.level * 1000));
-    $('dot').classList.toggle('live', !!view.live);
-    $('dot').title = view.live ? 'Reading game traffic' : 'Waiting for game traffic';
-    $('status').textContent = view.live ? 'Live' : 'Waiting for game…';
-    $('hint').textContent = view.haveList ? `${(view.all || []).filter(p => p.level > 0).length} pets owned` : 'pet list not seen yet';
+    (view.all || []).forEach(p => lastSig.set(p.id, p.souls + p.level * 1000));
   }
 
   function connect() {
     const es = new EventSource('/api/events');
-    es.onmessage = e => { try { view = JSON.parse(e.data); render(); } catch {} };
-    es.onerror = () => {
-      $('status').textContent = 'Tracker stopped'; $('dot').classList.remove('live');
-      es.close(); setTimeout(connect, 3000);
+    es.onmessage = e => {
+      try {
+        view = JSON.parse(e.data);
+        if (view.settings) set = Object.assign({}, set, view.settings);
+        render();
+      } catch {}
     };
+    es.onerror = () => { $('status').textContent = 'Tracker stopped'; $('dot').classList.remove('live'); es.close(); setTimeout(connect, 3000); };
   }
   render();
   connect();

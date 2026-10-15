@@ -17,18 +17,18 @@ import (
 // Minimal Npcap binding: wpcap.dll is loaded at runtime, no cgo needed.
 
 var (
-	wpcap            *syscall.DLL
-	pFindAllDevs     *syscall.Proc
-	pFreeAllDevs     *syscall.Proc
-	pOpenLive        *syscall.Proc
-	pNextEx          *syscall.Proc
-	pDatalink        *syscall.Proc
-	pCompile         *syscall.Proc
-	pSetFilter       *syscall.Proc
-	pGetErr          *syscall.Proc
-	pLibVersion      *syscall.Proc
-	loadOnce         sync.Once
-	loadErr          error
+	wpcap        *syscall.DLL
+	pFindAllDevs *syscall.Proc
+	pFreeAllDevs *syscall.Proc
+	pOpenLive    *syscall.Proc
+	pNextEx      *syscall.Proc
+	pDatalink    *syscall.Proc
+	pCompile     *syscall.Proc
+	pSetFilter   *syscall.Proc
+	pGetErr      *syscall.Proc
+	pLibVersion  *syscall.Proc
+	loadOnce     sync.Once
+	loadErr      error
 )
 
 func loadNpcap() error {

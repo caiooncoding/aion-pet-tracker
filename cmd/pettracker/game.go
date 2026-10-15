@@ -63,11 +63,12 @@ type kill struct {
 type State struct {
 	mu sync.Mutex
 
-	Pets      map[int]*Pet      `json:"pets"`
-	PetSlug   map[int]string    `json:"petSlug"`   // pet id -> wikily slug (learned)
-	NpcPet    map[int]int       `json:"npcPet"`    // npc code -> pet id (learned)
-	ListSeen  time.Time         `json:"listSeen"`  // last full list from login
-	Extra     map[string]string `json:"extra,omitempty"`
+	Pets     map[int]*Pet      `json:"pets"`
+	PetSlug  map[int]string    `json:"petSlug"`  // pet id -> wikily slug (learned)
+	NpcPet   map[int]int       `json:"npcPet"`   // npc code -> pet id (learned)
+	ListSeen time.Time         `json:"listSeen"` // last full list from login
+	Settings Settings          `json:"settings"`
+	Extra    map[string]string `json:"extra,omitempty"`
 
 	entities  map[int]*entity
 	kills     []kill
@@ -87,6 +88,7 @@ func NewState(path string, data *PetData) *State {
 		entities: map[int]*entity{},
 		path:     path,
 		data:     data,
+		Settings: defaultSettings(),
 	}
 	if b, err := os.ReadFile(path); err == nil {
 		_ = json.Unmarshal(b, s)
@@ -102,6 +104,7 @@ func NewState(path string, data *PetData) *State {
 		for _, p := range s.Pets {
 			p.SessionAdd = 0
 		}
+		s.Settings.normalize()
 	}
 	return s
 }
@@ -424,6 +427,10 @@ type PetView struct {
 }
 
 type View struct {
+	Version  string    `json:"version"`
+	Settings Settings  `json:"settings"`
+	Focus    *PetView  `json:"focus,omitempty"` // the pet you're farming right now
+	Session  int       `json:"session"`         // souls gained this session
 	Live     bool      `json:"live"`
 	Frames   int       `json:"frames"`
 	HaveList bool      `json:"haveList"`
@@ -435,7 +442,7 @@ type View struct {
 func (s *State) View(now time.Time) View {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	v := View{Live: now.Sub(s.lastFrame) < 15*time.Second, Frames: s.frames, HaveList: !s.ListSeen.IsZero()}
+	v := View{Version: version, Settings: s.Settings, Live: now.Sub(s.lastFrame) < 15*time.Second, Frames: s.frames, HaveList: !s.ListSeen.IsZero()}
 
 	mk := func(p *Pet) PetView {
 		pv := PetView{ID: p.ID, Level: p.Level, Souls: p.Souls, Need: soulsToNext(p.Level), Session: p.SessionAdd, Ago: -1}
@@ -537,6 +544,27 @@ func (s *State) View(now time.Time) View {
 		}
 		return a.Souls > b.Souls
 	})
+	for _, p := range s.Pets {
+		v.Session += p.SessionAdd
+	}
+	// focus: last pet you got a soul for (if recent), else the busiest unfinished pet nearby
+	if len(v.Recent) > 0 && v.Recent[0].Ago >= 0 && v.Recent[0].Ago < 300 && !v.Recent[0].Max {
+		f := v.Recent[0]
+		for _, n := range v.Nearby {
+			if n.ID == f.ID {
+				f.Nearby = n.Nearby
+			}
+		}
+		v.Focus = &f
+	} else {
+		for _, n := range v.Nearby {
+			if !n.Max && n.Need > 0 {
+				f := n
+				v.Focus = &f
+				break
+			}
+		}
+	}
 	return v
 }
 
@@ -571,22 +599,4 @@ func atoi(s string) int {
 		n = n*10 + int(c-'0')
 	}
 	return n
-}
-
-// SetName lets the user name a pet the tracker hasn't learned yet (slug "" clears it).
-func (s *State) SetName(id int, slug string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if slug == "" {
-		delete(s.PetSlug, id)
-	} else {
-		for other, sl := range s.PetSlug { // a slug belongs to one pet id
-			if sl == slug && other != id {
-				delete(s.PetSlug, other)
-			}
-		}
-		s.PetSlug[id] = slug
-	}
-	s.dirty = true
-	s.notify()
 }

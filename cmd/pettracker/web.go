@@ -65,22 +65,7 @@ func serveWeb(port int, st *State) error {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(st.data.List())
 	})
-	mux.HandleFunc("/api/name", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "POST only", 405)
-			return
-		}
-		var req struct {
-			ID   int    `json:"id"`
-			Slug string `json:"slug"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || !validPetID(req.ID) {
-			http.Error(w, "bad request", 400)
-			return
-		}
-		st.SetName(req.ID, req.Slug)
-		w.WriteHeader(204)
-	})
+	registerWindowAPI(mux, st)
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		return err

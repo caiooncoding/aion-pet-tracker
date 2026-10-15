@@ -18,9 +18,9 @@ const (
 )
 
 const (
-	probeLimit   = 128 * 1024
-	maxOOO       = 512
-	flowIdleTTL  = 10 * time.Minute
+	probeLimit  = 128 * 1024
+	maxOOO      = 512
+	flowIdleTTL = 10 * time.Minute
 )
 
 type flowKey struct {

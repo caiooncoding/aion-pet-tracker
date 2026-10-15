@@ -173,11 +173,11 @@ func (d *PetData) refresh(cache string) {
 	}
 	type row struct {
 		Data struct {
-			Slug     string `json:"slug"`
-			Name     string `json:"name"`
-			PetType  string `json:"petType"`
-			Type     string `json:"type"`
-			Icon     string `json:"icon"`
+			Slug     string          `json:"slug"`
+			Name     string          `json:"name"`
+			PetType  string          `json:"petType"`
+			Type     string          `json:"type"`
+			Icon     string          `json:"icon"`
 			Loc1     json.RawMessage `json:"loc1"`
 			Loc2     json.RawMessage `json:"loc2"`
 			Loc3     json.RawMessage `json:"loc3"`
